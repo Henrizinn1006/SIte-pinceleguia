@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+/* =====================================================================
+   Pincel & Guia — tokens de design (porta de apps/storefront/src/app/globals.css)
+   Paleta oficial da marca. Ver docs/07-DESIGN-SYSTEM.md no repo original.
+   ===================================================================== */
+
+@theme {
+  --color-cream: #f8f4ec;
+  --color-cream-dark: #efe6d8;
+  --color-warm-white: #fffdf9;
+  --color-ink: #33251f;
+  --color-ink-muted: #75645a;
+  --color-gold: #b4935a;
+  --color-caramel: #a77b50;
+  --color-olive: #77745a;
+
+  --color-caramel-deep: #956d47;
+  --color-caramel-text: #8c6743;
+  --color-gold-text: #866b3d;
+  --color-olive-text: #737157;
+  --color-gold-soft: #c7af84;
+
+  --color-beige: #e8dac6;
+  --color-beige-dark: #ddcaad;
+
+  --color-success: #4a7c59;
+  --color-warning: #8a6a2f;
+  --color-danger: #9b3a2f;
+
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+
+  --shadow-soft: 0 2px 12px rgb(51 37 31 / 0.07);
+  --shadow-medium: 0 4px 24px rgb(51 37 31 / 0.11);
+  --shadow-strong: 0 8px 40px rgb(51 37 31 / 0.15);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-beige);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-serif);
+    color: var(--color-ink);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-caramel);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .text-display {
+    font-size: clamp(2.5rem, 6vw + 0.5rem, 4rem);
+    line-height: 1.05;
+  }
+  .text-h1 {
+    font-size: clamp(2rem, 4vw + 0.5rem, 3rem);
+  }
+  .text-h2 {
+    font-size: clamp(1.5rem, 2.5vw + 0.5rem, 2.25rem);
+  }
+  .text-h3 {
+    font-size: clamp(1.25rem, 1.5vw + 0.5rem, 1.5rem);
+  }
+
+  .ornament {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--color-gold);
+  }
+  .ornament::before,
+  .ornament::after {
+    content: "";
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(to right, transparent, var(--color-gold-soft), transparent);
+  }
+
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.6s ease-out both;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@vortexis/db";
+import type { Prisma } from "@vortexis/db";
 import type { Actor } from "./actor";
 
 /**
@@ -71,7 +72,12 @@ export async function registrar(
         entityType: registro.entityType,
         entityId: registro.entityId ?? null,
         entityLabel: registro.entityLabel ?? null,
-        changes: limpar(registro.changes) ?? undefined,
+        // `Alteracoes` usa `unknown` para os valores de/para (podem ser
+        // qualquer tipo de campo do domínio); o Prisma exige JSON
+        // serializável em InputJsonValue — o cast é seguro porque
+        // `changes` só recebe diffs de campos de modelo, sempre
+        // serializáveis, nunca função/símbolo/classe.
+        changes: (limpar(registro.changes) ?? undefined) as Prisma.InputJsonValue | undefined,
         denied: false,
         ipAddress: registro.ipAddress ?? null,
         userAgent: registro.userAgent?.slice(0, 400) ?? null,

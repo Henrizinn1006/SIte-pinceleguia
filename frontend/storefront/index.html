@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Título e descrição padrão (usados quando este arquivo é servido
+      direto, sem passar pelo PHP — ex.: `npm run preview`). Quando o
+      backend/public/index.php serve este HTML compilado, ele substitui
+      o conteúdo de <title>/<meta name="description"> por regex
+      (SSR-lite, ver resolveMetaForPath()) e injeta JSON-LD/robots antes
+      de __EXTRA_HEAD__. Cada página React também ajusta document.title
+      via src/lib/head.ts, então o valor aqui é só um fallback seguro.
+    -->
+    <title>Pincel &amp; Guia — Porcelana autoral feita à mão</title>
+    <meta name="description" content="Porcelana autoral pintada à mão. Peças dedicadas aos Orixás, Guias e Entidades." />
+    <!--__EXTRA_HEAD__-->
+    <link rel="icon" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,27 @@
+# Pasta pública de uploads (imagens de produto). PHP nunca deve
+# executar aqui — mesmo se um arquivo malicioso for enviado por engano
+# (ex.: "foto.jpg.php"). Ver backend/src/Admin/ProductImageAdminRepository.php
+# para a validação de assinatura/MIME feita antes de qualquer arquivo
+# chegar aqui.
+
+<IfModule mod_authz_core.c>
+  <FilesMatch "\.(php|phtml|php\d)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+  <FilesMatch "\.(php|phtml|php\d)$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+  php_flag engine off
+</IfModule>
+
+Options -Indexes -ExecCGI

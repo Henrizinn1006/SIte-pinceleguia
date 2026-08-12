@@ -1,0 +1,27 @@
+# Pasta reservada para upload de imagens (Fase 2 — CRUD de produtos no
+# painel). Já protegida desde já: PHP nunca deve executar aqui, nem que
+# um arquivo malicioso (ex.: "foto.jpg.php") seja enviado por engano.
+
+# Apache 2.4+
+<IfModule mod_authz_core.c>
+  <FilesMatch "\.(php|phtml|php\d)$">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
+# Apache 2.2 (algumas contas Hostinger legadas)
+<IfModule !mod_authz_core.c>
+  <FilesMatch "\.(php|phtml|php\d)$">
+    Order allow,deny
+    Deny from all
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+  php_flag engine off
+</IfModule>
+
+Options -Indexes -ExecCGI

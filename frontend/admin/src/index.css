@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* Mesmos tokens do storefront (frontend/storefront/src/index.css) —
+   consistência visual entre loja e painel. */
+@theme {
+  --color-cream: #f8f4ec;
+  --color-cream-dark: #efe6d8;
+  --color-warm-white: #fffdf9;
+  --color-ink: #33251f;
+  --color-ink-muted: #75645a;
+  --color-gold: #b4935a;
+  --color-caramel: #a77b50;
+  --color-olive: #77745a;
+
+  --color-caramel-deep: #956d47;
+  --color-caramel-text: #8c6743;
+  --color-beige: #e8dac6;
+  --color-beige-dark: #ddcaad;
+
+  --color-success: #4a7c59;
+  --color-warning: #8a6a2f;
+  --color-danger: #9b3a2f;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, serif;
+
+  --radius-sm: 0.5rem;
+  --shadow-soft: 0 2px 12px rgb(51 37 31 / 0.07);
+  --shadow-medium: 0 4px 24px rgb(51 37 31 / 0.11);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-caramel);
+    outline-offset: 2px;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--color-beige);
+    font-size: 0.875rem;
+  }
+
+  th {
+    font-weight: 600;
+    color: var(--color-ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+  }
+
+  input, select, textarea {
+    font: inherit;
+  }
+}

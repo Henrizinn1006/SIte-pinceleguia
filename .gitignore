@@ -53,3 +53,4 @@ apps/*/.next/
 apps/*/next-env.d.ts
 packages/*/dist/
 .turbo/
+backend/.phpunit.result.cache

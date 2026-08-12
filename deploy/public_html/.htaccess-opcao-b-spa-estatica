@@ -1,0 +1,32 @@
+# =====================================================================
+# Modelo de .htaccess para a OPÇÃO B (ver README-HOSTINGER.md):
+# frontend/storefront/dist servido direto como arquivos estáticos,
+# API PHP numa subpasta /api.
+#
+# Para usar: copie este arquivo para public_html/.htaccess (sem o
+# sufixo "-opcao-b-spa-estatica").
+# =====================================================================
+
+RewriteEngine On
+
+# Nunca reescreva chamadas para a API — elas têm seu próprio .htaccess
+# em public_html/api/ apontando para o front controller PHP.
+RewriteRule ^api/ - [L]
+
+# Arquivo ou pasta real (JS, CSS, imagens, sitemap.xml se gerado
+# estaticamente) é servido direto.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Qualquer outra rota (/, /loja, /produto/algum-slug, ...) cai no shell
+# da SPA — o React Router decide o que renderizar no navegador.
+RewriteRule ^ /index.html [L]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+Options -Indexes
