@@ -1,0 +1,50 @@
+{
+  "name": "pincel-e-guia",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Pincel & Guia — storefront + admin. Projeto VORTEXIS.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run db:generate",
+    "dev": "npm run dev --workspace=@pincel/storefront",
+    "dev:admin": "npm run dev --workspace=@pincel/admin",
+    "build": "npm run db:generate && npm run build --workspace=@pincel/storefront",
+    "build:admin": "npm run db:generate && npm run build --workspace=@pincel/admin",
+    "build:all": "npm run build && npm run build:admin",
+    "start": "npm run start --workspace=@pincel/storefront",
+    "typecheck": "tsc --noEmit -p apps/storefront && tsc --noEmit -p apps/admin",
+    "lint": "npm run lint --workspace=@pincel/storefront",
+    "format": "prettier --write \"{apps,packages}/**/*.{ts,tsx,css}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check": "npm run check:boundaries && npm run typecheck && npm run test",
+    "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema packages/db/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema packages/db/prisma/schema.prisma",
+    "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
+    "db:seed": "tsx seed/demo.ts",
+    "db:setup": "prisma migrate dev --name init --schema packages/db/prisma/schema.prisma && tsx seed/rbac.ts && tsx seed/demo.ts",
+    "db:reset": "prisma migrate reset --force --schema packages/db/prisma/schema.prisma && tsx seed/rbac.ts && tsx seed/demo.ts",
+    "db:rbac": "tsx seed/rbac.ts",
+    "admin:criar": "tsx seed/criar-admin.ts"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@types/node": "^22.13.0",
+    "prettier": "^3.5.0",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@vortexis/auth": "*"
+  }
+}

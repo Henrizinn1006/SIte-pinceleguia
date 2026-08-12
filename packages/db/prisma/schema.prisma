@@ -1,0 +1,816 @@
+// =====================================================================
+// Pincel & Guia — schema do banco
+// Ver docs/03-MODELO-DADOS.md para a justificativa de cada decisão.
+//
+// REGRAS:
+//  - Dinheiro é SEMPRE Int em centavos (R$ 157,00 -> 15700). Nunca Float.
+//  - Produtos e categorias usam exclusão lógica (deletedAt).
+//  - Pedidos guardam SNAPSHOT: nunca dependem do preço atual do produto.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------
+// CONTAS
+// ---------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  lastName      String?   @map("last_name")
+  email         String    @unique
+  emailVerified Boolean   @default(false) @map("email_verified")
+  passwordHash  String?   @map("password_hash")
+  phone         String?
+  document      String? // CPF — opcional, exigido por alguns meios de pagamento
+  isActive      Boolean   @default(true) @map("is_active")
+  image         String?
+
+  /// Verdadeiro para quem acessa o painel. Cliente da loja é false.
+  /// Separado dos papéis porque é uma pergunta diferente: "pode entrar
+  /// no admin?" vs "o que pode fazer lá dentro?".
+  isStaff       Boolean   @default(false) @map("is_staff")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  addresses     Address[]
+  carts         Cart[]
+  orders        Order[]
+  sessions      Session[]
+  accounts      Account[]
+  roles         UserRole[]
+  auditLogs     AuditLog[]
+  invitesSent   Invite[]   @relation("InviteCreatedBy")
+  mediaEnviada  Media[]    @relation("MediaUploadedBy")
+
+  @@index([email])
+  @@index([isStaff, isActive])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------
+// PERMISSÕES (RBAC)
+//
+// Permissão é DADO, não código. Papel novo não exige migration.
+// Ver docs/13-AUTH-RBAC-SEGURANCA.md
+// ---------------------------------------------------------------------
+
+model Role {
+  id          String  @id @default(cuid())
+  /// Identificador estável usado no código: "admin", "editor".
+  key         String  @unique
+  name        String
+  description String?
+  /// Papel de sistema não pode ser excluído nem perder permissão.
+  isSystem    Boolean @default(false) @map("is_system")
+  position    Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String @id @default(cuid())
+  /// Formato "recurso.acao": product.create, section.publish, order.cancel
+  key         String @unique
+  description String
+  /// Agrupamento para a tela de permissões: "Catálogo", "Conteúdo"…
+  group       String
+
+  roles RolePermission[]
+
+  @@index([group])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id")
+  roleId String @map("role_id")
+
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  assignedBy String?  @map("assigned_by")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+/// Acesso ao painel é por convite. Não existe cadastro público —
+/// formulário de registro em admin é convite para força bruta.
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  /// SHA-256 do token. O token puro só existe no link enviado.
+  tokenHash   String    @unique @map("token_hash")
+  roleId      String    @map("role_id")
+  createdById String    @map("created_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  createdBy User @relation("InviteCreatedBy", fields: [createdById], references: [id])
+
+  @@index([email])
+  @@index([expiresAt, acceptedAt])
+  @@map("invites")
+}
+
+// Tabelas de sessão compatíveis com Better Auth (integração na FASE 3).
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  scope                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([identifier, value])
+  @@index([expiresAt])
+  @@map("verifications")
+}
+
+model Address {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  label         String? // "Casa", "Trabalho"
+  recipientName String   @map("recipient_name")
+  zipCode       String   @map("zip_code") @db.VarChar(9)
+  street        String
+  number        String
+  complement    String?
+  district      String
+  city          String
+  state         String   @db.VarChar(2)
+  isDefault     Boolean  @default(false) @map("is_default")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isDefault])
+  @@map("addresses")
+}
+
+// ---------------------------------------------------------------------
+// CATÁLOGO
+// ---------------------------------------------------------------------
+
+model Category {
+  id              String    @id @default(cuid())
+  name            String
+  slug            String    @unique
+  description     String?
+  imageUrl        String?   @map("image_url")
+  imageAlt        String?   @map("image_alt")
+  parentId        String?   @map("parent_id")
+  position        Int       @default(0)
+  isActive        Boolean   @default(true) @map("is_active")
+  showOnHome      Boolean   @default(false) @map("show_on_home")
+  metaTitle       String?   @map("meta_title")
+  metaDescription String?   @map("meta_description")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([slug])
+  @@index([isActive, position])
+  @@index([showOnHome, position])
+  @@map("categories")
+}
+
+model Product {
+  id               String    @id @default(cuid())
+  name             String
+  slug             String    @unique
+  description      String    @db.Text
+  shortDescription String?   @map("short_description")
+  categoryId       String    @map("category_id")
+
+  // Dinheiro em CENTAVOS
+  basePriceInCents Int       @map("base_price_in_cents")
+  salePriceInCents Int?      @map("sale_price_in_cents")
+  saleStartsAt     DateTime? @map("sale_starts_at")
+  saleEndsAt       DateTime? @map("sale_ends_at")
+
+  isActive   Boolean @default(true) @map("is_active")
+  isFeatured Boolean @default(false) @map("is_featured")
+  position   Int     @default(0)
+
+  // Necessários para cotação de frete
+  weightInGrams Int? @map("weight_in_grams")
+  widthMm       Int? @map("width_mm")
+  heightMm      Int? @map("height_mm")
+  lengthMm      Int? @map("length_mm")
+
+  metaTitle       String?   @map("meta_title")
+  metaDescription String?   @map("meta_description")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  category   Category         @relation(fields: [categoryId], references: [id])
+  images     ProductImage[]
+  variants   ProductVariant[]
+  orderItems OrderItem[]
+
+  @@index([slug])
+  @@index([isActive, isFeatured])
+  @@index([categoryId, isActive])
+  @@index([isActive, createdAt(sort: Desc)])
+  @@index([isActive, basePriceInCents])
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------
+// BIBLIOTECA DE MÍDIA
+//
+// O banco guarda REFERÊNCIA, nunca o binário. Ver docs/12 §2.
+// ---------------------------------------------------------------------
+
+model Media {
+  id String @id @default(cuid())
+
+  /// Caminho no storage. Único — evita sobrescrever arquivo por engano.
+  storageKey String @unique @map("storage_key")
+  /// URL pública servida pelo provedor configurado.
+  url        String
+
+  mimeType    String @map("mime_type")
+  sizeInBytes Int    @map("size_in_bytes")
+  width       Int?
+  height      Int?
+
+  /// Placeholder desfocado — evita salto de layout ao carregar.
+  blurDataUrl String? @map("blur_data_url")
+
+  /// Texto alternativo. Editável no painel: acessibilidade é conteúdo,
+  /// não configuração técnica.
+  alt     String?
+  caption String?
+
+  /// Nome original enviado, só para a pessoa reconhecer o arquivo.
+  /// NUNCA usado como caminho — ver docs/13 §3.
+  originalName String? @map("original_name")
+
+  uploadedById String?   @map("uploaded_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  /// Exclusão lógica: o arquivo só sai do storage depois de 30 dias
+  /// órfão. Apagar imagem por engano é irreversível.
+  deletedAt    DateTime? @map("deleted_at")
+
+  uploadedBy    User?          @relation("MediaUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  productImages ProductImage[]
+
+  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([mimeType])
+  @@map("media")
+}
+
+model ProductImage {
+  id         String   @id @default(cuid())
+  productId  String   @map("product_id")
+
+  /// Vínculo com a biblioteca. Opcional nesta fase: as imagens que já
+  /// existem seguem por `url`. A migração para exigir `mediaId` vem na
+  /// FASE 6, em passo separado — ver docs/17 §R5.
+  mediaId    String?  @map("media_id")
+
+  storageKey String?  @map("storage_key")
+  url        String
+  alt        String // NOT NULL por acessibilidade — ver docs/07
+  width      Int?
+  height     Int?
+  blurDataUrl String? @map("blur_data_url")
+  position   Int      @default(0)
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media   Media?  @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+
+  @@index([productId, position])
+  @@index([mediaId])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id               String  @id @default(cuid())
+  productId        String  @map("product_id")
+  sku              String  @unique
+  name             String  @default("Padrão")
+  priceInCents     Int?    @map("price_in_cents") // sobrepõe o preço do produto
+  salePriceInCents Int?    @map("sale_price_in_cents")
+  stock            Int     @default(0)
+  isActive         Boolean @default(true) @map("is_active")
+  position         Int     @default(0)
+
+  weightInGrams Int? @map("weight_in_grams")
+  widthMm       Int? @map("width_mm")
+  heightMm      Int? @map("height_mm")
+  lengthMm      Int? @map("length_mm")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product      Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+  movements    InventoryMovement[]
+  reservations StockReservation[]
+
+  @@index([productId, position])
+  @@index([sku])
+  @@map("product_variants")
+}
+
+// ---------------------------------------------------------------------
+// ESTOQUE
+// ---------------------------------------------------------------------
+
+enum InventoryMovementType {
+  SALE
+  RESTOCK
+  MANUAL_ADJUSTMENT
+  CANCELLATION_RETURN
+  RESERVATION
+  RESERVATION_RELEASE
+}
+
+model InventoryMovement {
+  id        String                @id @default(cuid())
+  variantId String                @map("variant_id")
+  type      InventoryMovementType
+  quantity  Int // negativo = saída, positivo = entrada
+  orderId   String?               @map("order_id")
+  userId    String?               @map("user_id")
+  note      String?
+  createdAt DateTime              @default(now()) @map("created_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order   Order?         @relation(fields: [orderId], references: [id])
+
+  @@index([variantId, createdAt(sort: Desc)])
+  @@index([orderId])
+  @@map("inventory_movements")
+}
+
+model StockReservation {
+  id         String    @id @default(cuid())
+  variantId  String    @map("variant_id")
+  orderId    String    @map("order_id")
+  quantity   Int
+  expiresAt  DateTime  @map("expires_at")
+  releasedAt DateTime? @map("released_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, releasedAt])
+  @@index([orderId])
+  @@map("stock_reservations")
+}
+
+// ---------------------------------------------------------------------
+// CARRINHO
+// ---------------------------------------------------------------------
+
+model Cart {
+  id           String   @id @default(cuid())
+  userId       String?  @map("user_id")
+  sessionToken String?  @unique @map("session_token")
+  couponId     String?  @map("coupon_id")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user   User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  coupon Coupon?    @relation(fields: [couponId], references: [id])
+  items  CartItem[]
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String   @map("cart_id")
+  variantId String   @map("variant_id")
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, variantId])
+  @@map("cart_items")
+}
+
+// ---------------------------------------------------------------------
+// CUPONS
+// ---------------------------------------------------------------------
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Coupon {
+  id                    String       @id @default(cuid())
+  code                  String       @unique
+  description           String?
+  discountType          DiscountType @map("discount_type")
+  discountValue         Int          @map("discount_value") // % inteiro OU centavos
+  minOrderInCents       Int?         @map("min_order_in_cents")
+  maxDiscountInCents    Int?         @map("max_discount_in_cents")
+  startsAt              DateTime?    @map("starts_at")
+  endsAt                DateTime?    @map("ends_at")
+  usageLimit            Int?         @map("usage_limit")
+  usageCount            Int          @default(0) @map("usage_count")
+  usageLimitPerCustomer Int?         @map("usage_limit_per_customer")
+  isActive              Boolean      @default(true) @map("is_active")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  carts       Cart[]
+  orders      Order[]
+  redemptions CouponRedemption[]
+
+  @@index([code, isActive])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id                     String   @id @default(cuid())
+  couponId               String   @map("coupon_id")
+  orderId                String   @map("order_id")
+  userId                 String?  @map("user_id")
+  discountAppliedInCents Int      @map("discount_applied_in_cents")
+  createdAt              DateTime @default(now()) @map("created_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, orderId])
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
+}
+
+// ---------------------------------------------------------------------
+// PEDIDOS
+// ---------------------------------------------------------------------
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique @map("order_number")
+  userId      String?     @map("user_id")
+  status      OrderStatus @default(PENDING_PAYMENT)
+
+  // --- SNAPSHOT do cliente (não depende da tabela users) ---
+  customerName     String  @map("customer_name")
+  customerEmail    String  @map("customer_email")
+  customerPhone    String  @map("customer_phone")
+  customerDocument String? @map("customer_document")
+
+  // --- SNAPSHOT do endereço de entrega ---
+  shippingZipCode    String  @map("shipping_zip_code") @db.VarChar(9)
+  shippingStreet     String  @map("shipping_street")
+  shippingNumber     String  @map("shipping_number")
+  shippingComplement String? @map("shipping_complement")
+  shippingDistrict   String  @map("shipping_district")
+  shippingCity       String  @map("shipping_city")
+  shippingState      String  @map("shipping_state") @db.VarChar(2)
+
+  // --- Valores em CENTAVOS ---
+  subtotalInCents Int @map("subtotal_in_cents")
+  shippingInCents Int @default(0) @map("shipping_in_cents")
+  discountInCents Int @default(0) @map("discount_in_cents")
+  totalInCents    Int @map("total_in_cents")
+
+  shippingMethod        String? @map("shipping_method")
+  shippingCarrier       String? @map("shipping_carrier")
+  estimatedDeliveryDays Int?    @map("estimated_delivery_days")
+
+  couponId   String? @map("coupon_id")
+  couponCode String? @map("coupon_code")
+
+  customerNote String? @map("customer_note")
+  internalNote String? @map("internal_note")
+
+  // Token para acompanhamento do pedido por visitante (sem conta)
+  trackingToken String @unique @map("tracking_token")
+
+  paidAt      DateTime? @map("paid_at")
+  shippedAt   DateTime? @map("shipped_at")
+  deliveredAt DateTime? @map("delivered_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user            User?               @relation(fields: [userId], references: [id])
+  coupon          Coupon?             @relation(fields: [couponId], references: [id])
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+  payments        Payment[]
+  shipments       Shipment[]
+  reservations    StockReservation[]
+  movements       InventoryMovement[]
+  redemptions     CouponRedemption[]
+
+  @@index([orderNumber])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([customerEmail])
+  @@map("orders")
+}
+
+/// SNAPSHOT da linha do pedido. Consultar um pedido antigo NUNCA faz
+/// JOIN em products para descobrir nome ou preço.
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String  @map("order_id")
+  productId String? @map("product_id")
+  variantId String? @map("variant_id")
+
+  productName      String  @map("product_name")
+  variantName      String? @map("variant_name")
+  sku              String?
+  imageUrl         String? @map("image_url")
+  unitPriceInCents Int     @map("unit_price_in_cents")
+  quantity         Int
+  subtotalInCents  Int     @map("subtotal_in_cents")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String      @map("order_id")
+  fromStatus OrderStatus? @map("from_status")
+  toStatus  OrderStatus @map("to_status")
+  note      String?
+  changedBy String?     @map("changed_by")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+// ---------------------------------------------------------------------
+// PAGAMENTOS
+// ---------------------------------------------------------------------
+
+enum PaymentMethod {
+  PIX
+  CREDIT_CARD
+  DEBIT_CARD
+  BOLETO
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  IN_PROCESS
+  REJECTED
+  REFUNDED
+  CANCELLED
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String        @map("order_id")
+  gateway          String        @default("mercadopago")
+  gatewayPaymentId String?       @unique @map("gateway_payment_id")
+  method           PaymentMethod
+  status           PaymentStatus @default(PENDING)
+  amountInCents    Int           @map("amount_in_cents")
+  installments     Int?
+
+  // PIX
+  pixQrCode       String? @map("pix_qr_code") @db.Text
+  pixQrCodeBase64 String? @map("pix_qr_code_base64") @db.Text
+  pixExpiresAt    DateTime? @map("pix_expires_at")
+
+  // Cartão — APENAS bandeira e 4 últimos dígitos.
+  // Número completo, CVV e validade NUNCA são armazenados.
+  cardBrand    String? @map("card_brand")
+  cardLastFour String? @map("card_last_four") @db.VarChar(4)
+
+  rejectionReason String?  @map("rejection_reason")
+  rawResponse     Json?    @map("raw_response") // já sanitizado
+  paidAt          DateTime? @map("paid_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  order  Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@map("payments")
+}
+
+/// Garante idempotência do webhook: o UNIQUE em gatewayEventId faz
+/// com que um reenvio do gateway seja um no-op.
+model PaymentEvent {
+  id             String    @id @default(cuid())
+  paymentId      String?   @map("payment_id")
+  gateway        String
+  gatewayEventId String    @unique @map("gateway_event_id")
+  eventType      String    @map("event_type")
+  payload        Json
+  processedAt    DateTime? @map("processed_at")
+  error          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  payment Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([processedAt])
+  @@map("payment_events")
+}
+
+// ---------------------------------------------------------------------
+// ENTREGA
+// ---------------------------------------------------------------------
+
+model Shipment {
+  id                 String    @id @default(cuid())
+  orderId            String    @map("order_id")
+  carrier            String
+  trackingCode       String?   @map("tracking_code")
+  trackingUrl        String?   @map("tracking_url")
+  labelUrl           String?   @map("label_url")
+  providerShipmentId String?   @map("provider_shipment_id")
+  shippedAt          DateTime? @map("shipped_at")
+  deliveredAt        DateTime? @map("delivered_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([trackingCode])
+  @@map("shipments")
+}
+
+// ---------------------------------------------------------------------
+// CONTEÚDO E CONFIGURAÇÃO
+// ---------------------------------------------------------------------
+
+/// Configuração editável pelo admin: hero da home, frete padrão,
+/// dados de contato. Permite mudar conteúdo SEM deploy.
+model Setting {
+  key       String   @id
+  value     Json
+  group     String   @default("geral")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([group])
+  @@map("settings")
+}
+
+model ContentPage {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  content         String   @db.Text
+  metaTitle       String?  @map("meta_title")
+  metaDescription String?  @map("meta_description")
+  isPublished     Boolean  @default(false) @map("is_published")
+  isPlaceholder   Boolean  @default(true) @map("is_placeholder")
+  position        Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([slug, isPublished])
+  @@map("content_pages")
+}
+
+/// Trilha de auditoria de tudo que altera estado do negócio ou do
+/// conteúdo. Tentativa NEGADA também é registrada — é o primeiro sinal
+/// de credencial comprometida. Ver docs/13-AUTH-RBAC-SEGURANCA.md §6
+model AuditLog {
+  id     String  @id @default(cuid())
+  userId String? @map("user_id")
+
+  /// Snapshot: o usuário pode ser removido, o log permanece legível.
+  userEmail String @map("user_email")
+
+  /// "product.update", "section.publish", "auth.login.failed"
+  action String
+
+  entityType String  @map("entity_type")
+  entityId   String? @map("entity_id")
+  /// "Prato Iemanjá" — log com só o id é ilegível seis meses depois.
+  entityLabel String? @map("entity_label")
+
+  /// Apenas os campos alterados, por allowlist.
+  /// NUNCA senha, token, segredo de gateway ou dado de cartão.
+  changes Json?
+
+  /// true quando a ação foi barrada por falta de permissão.
+  denied Boolean @default(false)
+
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}

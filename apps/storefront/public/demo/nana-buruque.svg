@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Imagem de demonstração — Nana Buruque">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="70%">
+      <stop offset="0%" stop-color="#FFFCF8"/><stop offset="100%" stop-color="#F2EBE1"/>
+    </radialGradient>
+    <linearGradient id="fig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#B9A7D4"/><stop offset="100%" stop-color="#8E76B8"/>
+    </linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="9"/></filter>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <ellipse cx="400" cy="700" rx="230" ry="26" fill="#6B4E36" opacity=".10" filter="url(#soft)"/>
+  <circle cx="400" cy="400" r="286" fill="#6B4E36" opacity=".07" filter="url(#soft)"/>
+  <circle cx="400" cy="396" r="278" fill="#FFFCF8"/>
+  <circle cx="400" cy="396" r="278" fill="none" stroke="#C9A227" stroke-width="6"/>
+  <circle cx="400" cy="396" r="258" fill="none" stroke="#DFC77E" stroke-width="1.5" opacity=".8"/>
+  <circle cx="400" cy="396" r="216" fill="none" stroke="#E8DCCB" stroke-width="1"/>
+  <g opacity=".9">
+    <ellipse cx="400" cy="430" rx="86" ry="132" fill="url(#fig)" opacity=".85"/>
+    <circle cx="400" cy="272" r="42" fill="url(#fig)"/>
+    <path d="M400 300 C 330 340 306 420 316 520 L 484 520 C 494 420 470 340 400 300 Z" fill="url(#fig)" opacity=".55"/>
+    <path d="M330 545 Q400 566 470 545" stroke="#C9A227" stroke-width="3" fill="none" opacity=".7"/>
+  </g>
+  <text x="400" y="640" text-anchor="middle" font-family="Georgia,serif" font-size="30" fill="#6B4E36" letter-spacing="1.5">Nana Buruque</text>
+  <text x="400" y="676" text-anchor="middle" font-family="Helvetica,Arial,sans-serif" font-size="15" fill="#9E8B76" letter-spacing="3">IMAGEM DE DEMONSTRACAO</text>
+</svg>

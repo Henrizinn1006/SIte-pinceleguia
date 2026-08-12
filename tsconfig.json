@@ -1,0 +1,6 @@
+{
+  "//": "OBSOLETO — a configuração agora é por app. Ver apps/*/tsconfig.json e tsconfig.base.json. Pode apagar este arquivo.",
+  "extends": "./tsconfig.base.json",
+  "include": [],
+  "exclude": ["**/*"]
+}

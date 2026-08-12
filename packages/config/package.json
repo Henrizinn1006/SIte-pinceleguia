@@ -1,0 +1,7 @@
+{
+  "name": "@vortexis/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Configuração compartilhada: tsconfig e ESLint.",
+  "files": ["tsconfig.next.json", "eslint.base.mjs"]
+}

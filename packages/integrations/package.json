@@ -1,0 +1,10 @@
+{
+  "name": "@vortexis/integrations",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Adapters de serviços externos atrás de interfaces. Genérico e substituível.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./storage": "./src/storage/index.ts"
+  }
+}

@@ -1,0 +1,41 @@
+# =====================================================================
+# Banco de desenvolvimento LOCAL — Pincel & Guia
+#
+# Sobe um PostgreSQL na sua máquina. As credenciais abaixo são de
+# desenvolvimento e batem com o .env do projeto.
+#
+# ⚠️ Isto é APENAS para desenvolvimento local. Em produção usaremos um
+#    Postgres gerenciado (Neon), com credenciais reais e diferentes.
+#    Ver docs/08-DEPLOY-E-CUSTOS.md
+#
+# Uso:
+#   docker compose up -d      → liga o banco
+#   docker compose down       → desliga (os dados continuam salvos)
+#   docker compose down -v    → desliga e APAGA todos os dados
+# =====================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: pincelguia-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pincelguia
+      POSTGRES_PASSWORD: fWHGJ0bxmRvkgbsiPrNfjiwq
+      POSTGRES_DB: pincelguia
+      # Collation pt-BR para ordenação correta de acentos
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      # host:container — se a porta 5432 já estiver ocupada na sua
+      # máquina, troque para "5433:5432" e ajuste o .env.
+      - "5432:5432"
+    volumes:
+      - pincelguia_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pincelguia -d pincelguia"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pincelguia_pgdata:
